@@ -601,28 +601,116 @@ function startApp() {
   }
 
   function printShift() {
-    var gridEl = document.querySelector(".grid-wrap");
-    if (!gridEl) { window.print(); return; }
+    var days = getDays();
+    var sById = staffById();
+    var weekLabel = (state.weekStart.getMonth() + 1) + "/" + state.weekStart.getDate() +
+                    " – " + (addDays(state.weekStart, 6).getMonth() + 1) + "/" + addDays(state.weekStart, 6).getDate();
 
-    var A4_LANDSCAPE_PX = 1063;
-    var gridWidth = gridEl.scrollWidth;
-    var scale = Math.min(1, A4_LANDSCAPE_PX / gridWidth);
-    scale = Math.round(scale * 100) / 100;
+    // 印刷用の定数(A4横向き: 印刷幅約277mm / 24時間)
+    var PRINT_HOUR_W = 34;   // 1時間あたりのpx幅(印刷用)
+    var PRINT_ROW_H = 28;    // 1行の高さ(印刷用)
+    var PRINT_HEADER_W = 52; // 日付列幅
+    var PRINT_TIMELINE_W = PRINT_HOUR_W * 24;
 
-    var origHeight = gridEl.offsetHeight;
-    gridEl.style.transform = "scale(" + scale + ")";
-    gridEl.style.transformOrigin = "top left";
-    gridEl.style.width = (100 / scale) + "%";
-    gridEl.style.marginBottom = "-" + Math.round(origHeight * (1 - scale)) + "px";
+    // 印刷用HTML: グリッドをゼロから構築
+    var html = '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">';
+    html += '<style>';
+    html += '* { box-sizing: border-box; margin: 0; padding: 0; }';
+    html += 'body { font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif; background: #fff; padding: 6mm; }';
+    html += 'h2 { font-size: 11pt; font-weight: 900; margin-bottom: 4px; }';
+    html += '.grid { border: 1px solid #888; border-radius: 0; width: 100%; border-collapse: collapse; table-layout: fixed; }';
+    html += '.hour-header { display: flex; border-bottom: 2px solid #000; }';
+    html += '.hh-spacer { width: ' + PRINT_HEADER_W + 'px; flex-shrink: 0; background: #1C1B19; }';
+    html += '.hh-cell { width: ' + PRINT_HOUR_W + 'px; flex-shrink: 0; font-size: 7px; color: #555; padding: 3px 0 3px 2px; border-left: 1px solid #ccc; }';
+    html += '.day-row { display: flex; border-top: 2px solid #888; }';
+    html += '.day-label { width: ' + PRINT_HEADER_W + 'px; flex-shrink: 0; padding: 4px 4px; background: #f5f3ee; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid #888; }';
+    html += '.day-date { font-size: 9pt; font-weight: 900; }';
+    html += '.day-wd { font-size: 7pt; color: #666; }';
+    html += '.day-sun .day-wd { color: #c00; }';
+    html += '.day-sat .day-wd { color: #00c; }';
+    html += '.day-today { background: #fff3ea; }';
+    html += '.timeline { position: relative; width: ' + PRINT_TIMELINE_W + 'px; flex-shrink: 0; background: #fafaf7; }';
+    html += '.h-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #ddd; }';
+    html += '.h-line.major { background: #aaa; }';
+    html += '.bar { position: absolute; border-radius: 3px; color: #fff; font-size: 7px; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }';
+    html += '.slot-bg { position: absolute; top: 0; bottom: 0; border-left: 2px solid rgba(0,0,0,0.12); }';
+    html += '@page { size: A4 landscape; margin: 6mm; }';
+    html += '@media print { body { padding: 0; } }';
+    html += '</style></head><body>';
+    html += '<h2>シフト管理表 ' + weekLabel + '</h2>';
+    html += '<div class="grid">';
 
-    window.print();
+    // 時間ヘッダー
+    html += '<div class="hour-header"><div class="hh-spacer"></div>';
+    for (var hi = 0; hi < 24; hi++) {
+      var hLabel = ((8 + hi) % 24) + ':00';
+      html += '<div class="hh-cell">' + hLabel + '</div>';
+    }
+    html += '</div>';
 
-    setTimeout(function () {
-      gridEl.style.transform = "";
-      gridEl.style.transformOrigin = "";
-      gridEl.style.width = "";
-      gridEl.style.marginBottom = "";
-    }, 500);
+    // 各日行
+    var todayKey = dateKey(new Date());
+    days.forEach(function(d) {
+      var dKey = dateKey(d);
+      var rc = computeRows(dKey);
+      var placements = rc.placements;
+      var rowCount = Math.max(rc.rowCount, 1);
+      var rowH = Math.max(PRINT_ROW_H, rowCount * PRINT_ROW_H);
+      var isSun = d.getDay() === 0;
+      var isSat = d.getDay() === 6;
+      var isToday = dKey === todayKey;
+      var dayClass = 'day-row' + (isSun ? ' day-sun' : isSat ? ' day-sat' : '') + (isToday ? ' day-today' : '');
+
+      html += '<div class="' + dayClass + '">';
+      html += '<div class="day-label' + (isToday ? ' day-today' : '') + '">';
+      html += '<div class="day-date">' + (d.getMonth()+1) + '/' + d.getDate() + '</div>';
+      html += '<div class="day-wd">(' + WEEKDAY_JA[d.getDay()] + ')</div>';
+      html += '</div>';
+
+      html += '<div class="timeline" style="height:' + rowH + 'px;">';
+
+      // 縦線
+      for (var li = 0; li < 24; li++) {
+        html += '<div class="h-line' + (li % 6 === 0 ? ' major' : '') + '" style="left:' + (li * PRINT_HOUR_W) + 'px;"></div>';
+      }
+
+      // SLOT背景(state.showCostに関係なく必要人数ラベルは省略、背景のみ)
+      SLOTS.forEach(function(slot) {
+        var slotL = (slot.startMin / 60) * PRINT_HOUR_W;
+        var slotW = ((slot.endMin - slot.startMin) / 60) * PRINT_HOUR_W;
+        var overlapping = placements.filter(function(p) { return p.entry.start < slot.endMin && p.entry.end > slot.startMin; }).length;
+        var bg = overlapping < slot.min ? 'rgba(214,64,44,0.08)' : 'transparent';
+        html += '<div class="slot-bg" style="left:' + slotL + 'px;width:' + slotW + 'px;background:' + bg + ';border-left-color:' + slot.tint + '55;"></div>';
+      });
+
+      // 勤務バー
+      placements.forEach(function(pl) {
+        var entry = pl.entry, row = pl.row;
+        var s = sById[entry.staffId];
+        if (!s) return;
+        var barL = (entry.start / 60) * PRINT_HOUR_W;
+        var barW = Math.max(((entry.end - entry.start) / 60) * PRINT_HOUR_W, 20);
+        var barTop = row * PRINT_ROW_H + 3;
+        var barH = PRINT_ROW_H - 6;
+        var label = s.name;
+        if (entry.breakMin) label += '(休' + entry.breakMin + '分)';
+        html += '<div class="bar" style="left:' + barL + 'px;top:' + barTop + 'px;width:' + (barW-2) + 'px;height:' + barH + 'px;background:' + s.color + ';">' + label + '</div>';
+      });
+
+      html += '</div></div>';
+    });
+
+    html += '</div>';
+    html += '<script>window.onload = function(){ window.print(); };<\/script>';
+    html += '</body></html>';
+
+    var win = window.open('', '_blank');
+    if (!win) {
+      showToast('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください', 'error');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
   }
 
   function showExportModal(json, filename) {
