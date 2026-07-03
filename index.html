@@ -67,14 +67,16 @@
 
   /* 印刷用スタイル */
   @media print {
-    body { background: #fff; }
+    body { background: #fff; margin: 0; padding: 0; }
     .app-header, .week-nav-row, .helper-text, .day-copy-btn, .day-paste-btn { display: none !important; }
-    .grid-wrap { border: none; border-radius: 0; overflow: visible; }
-    .day-row { break-inside: avoid; }
+    .app-main { padding: 0 !important; max-width: none !important; }
+    .grid-wrap { border: none !important; border-radius: 0 !important; overflow: visible !important; box-shadow: none !important; }
+    .grid-inner { min-width: unset !important; }
     .work-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .slot-bg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .drag-handle { display: none; }
-    @page { size: A4 landscape; margin: 10mm; }
+    .drag-handle { display: none !important; }
+    .print-scale-wrap { transform-origin: top left; }
+    @page { size: A4 landscape; margin: 8mm; }
   }
   .day-label { width: 90px; flex-shrink: 0; background: #FAF7F0; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; }
   .day-label.today { background: #FFF0E5; }
@@ -598,6 +600,31 @@ function startApp() {
     }
   }
 
+  function printShift() {
+    var gridEl = document.querySelector(".grid-wrap");
+    if (!gridEl) { window.print(); return; }
+
+    var A4_LANDSCAPE_PX = 1063;
+    var gridWidth = gridEl.scrollWidth;
+    var scale = Math.min(1, A4_LANDSCAPE_PX / gridWidth);
+    scale = Math.round(scale * 100) / 100;
+
+    var origHeight = gridEl.offsetHeight;
+    gridEl.style.transform = "scale(" + scale + ")";
+    gridEl.style.transformOrigin = "top left";
+    gridEl.style.width = (100 / scale) + "%";
+    gridEl.style.marginBottom = "-" + Math.round(origHeight * (1 - scale)) + "px";
+
+    window.print();
+
+    setTimeout(function () {
+      gridEl.style.transform = "";
+      gridEl.style.transformOrigin = "";
+      gridEl.style.width = "";
+      gridEl.style.marginBottom = "";
+    }, 500);
+  }
+
   function showExportModal(json, filename) {
     var overlay = el("div", { style: { position: "fixed", inset: "0", background: "rgba(28,27,25,0.6)", zIndex: "200", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" } });
     var box = el("div", { style: { background: "#FAF7F0", borderRadius: "12px", padding: "20px", width: "100%", maxWidth: "480px", maxHeight: "80vh", display: "flex", flexDirection: "column", gap: "12px" } });
@@ -679,36 +706,7 @@ function startApp() {
               class: "toggle-btn" + (state.showCost ? " active" : ""),
               onclick: function () { state.showCost = !state.showCost; render(); }
             }, [iconYen(14), el("span", { class: "btn-label" }, [document.createTextNode(state.showCost ? " 金額表示" : " 金額非表示")])]),
-            el("button", { class: "logout-btn", onclick: function () {
-              // シフトグリッドのみを印刷用ウィンドウで開く
-              var gridEl = document.querySelector(".grid-wrap");
-              if (!gridEl) { window.print(); return; }
-              var win = window.open("", "_blank", "width=1200,height=800");
-              if (!win) { window.print(); return; } // ポップアップブロック時はそのまま印刷
-              var styles = Array.from(document.styleSheets).map(function(ss) {
-                try { return Array.from(ss.cssRules).map(function(r){ return r.cssText; }).join("\n"); }
-                catch(e) { return ""; }
-              }).join("\n");
-              var days = getDays();
-              var weekLabel = (state.weekStart.getMonth()+1) + "/" + state.weekStart.getDate() + " \u2013 " + (addDays(state.weekStart,6).getMonth()+1) + "/" + addDays(state.weekStart,6).getDate();
-              win.document.write(
-                "<!DOCTYPE html><html lang=\"ja\"><head><meta charset=\"UTF-8\">" +
-                "<style>\nbody{font-family:-apple-system,sans-serif;background:#fff;margin:0;padding:8mm;}\n" +
-                "h2{font-size:14pt;margin:0 0 8px;font-weight:900;}\n" +
-                ".grid-wrap{overflow:visible;border:none;border-radius:0;}\n" +
-                ".day-copy-btn,.day-paste-btn,.drag-handle{display:none!important;}\n" +
-                ".work-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact;}\n" +
-                ".slot-bg{-webkit-print-color-adjust:exact;print-color-adjust:exact;}\n" +
-                "@page{size:A4 landscape;margin:8mm;}\n" +
-                styles +
-                "</style></head><body>" +
-                "<h2>\u30b7\u30d5\u30c8\u7ba1\u7406\u8868 " + weekLabel + "</h2>" +
-                gridEl.outerHTML +
-                "<script>window.onload=function(){window.print();window.close();};<\/script>" +
-                "</body></html>"
-              );
-              win.document.close();
-            }}, [
+            el("button", { class: "logout-btn", onclick: function () { printShift(); } }, [
               iconFilePrint(14), el("span", { class: "btn-label" }, [document.createTextNode(" PDF出力")])
             ]),
             el("button", { class: "logout-btn", onclick: function () { exportData(); } }, [
