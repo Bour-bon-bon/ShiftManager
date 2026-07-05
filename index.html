@@ -606,102 +606,114 @@ function startApp() {
     var weekLabel = (state.weekStart.getMonth() + 1) + "/" + state.weekStart.getDate() +
                     " – " + (addDays(state.weekStart, 6).getMonth() + 1) + "/" + addDays(state.weekStart, 6).getDate();
 
-    // 印刷用の定数(A4横向き: 印刷幅約277mm / 24時間)
-    var PRINT_HOUR_W = 34;   // 1時間あたりのpx幅(印刷用)
-    var PRINT_ROW_H = 28;    // 1行の高さ(印刷用)
-    var PRINT_HEADER_W = 52; // 日付列幅
-    var PRINT_TIMELINE_W = PRINT_HOUR_W * 24;
+    // 各日のrowCountを事前計算
+    var todayKey = dateKey(new Date());
+    var dayData = days.map(function(d) {
+      var dKey = dateKey(d);
+      var rc = computeRows(dKey);
+      return { d: d, dKey: dKey, rowCount: Math.max(rc.rowCount, 1), placements: rc.placements };
+    });
+    // 最大rowCountを持つ日に合わせて全日の最小行数を揃える
+    var maxRowCount = dayData.reduce(function(m, dd) { return Math.max(m, dd.rowCount); }, 1);
 
-    // 印刷用HTML: グリッドをゼロから構築
+    // 印刷用HTML: CSSのflexとvhを使ってA4横1枚に収める
     var html = '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">';
     html += '<style>';
     html += '* { box-sizing: border-box; margin: 0; padding: 0; }';
-    html += 'body { font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif; background: #fff; padding: 6mm; }';
-    html += 'h2 { font-size: 11pt; font-weight: 900; margin-bottom: 4px; }';
-    html += '.grid { border: 1px solid #888; border-radius: 0; width: 100%; border-collapse: collapse; table-layout: fixed; }';
-    html += '.hour-header { display: flex; border-bottom: 2px solid #000; }';
-    html += '.hh-spacer { width: ' + PRINT_HEADER_W + 'px; flex-shrink: 0; background: #1C1B19; }';
-    html += '.hh-cell { width: ' + PRINT_HOUR_W + 'px; flex-shrink: 0; font-size: 7px; color: #555; padding: 3px 0 3px 2px; border-left: 1px solid #ccc; }';
-    html += '.day-row { display: flex; border-top: 2px solid #888; }';
-    html += '.day-label { width: ' + PRINT_HEADER_W + 'px; flex-shrink: 0; padding: 4px 4px; background: #f5f3ee; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid #888; }';
-    html += '.day-date { font-size: 9pt; font-weight: 900; }';
-    html += '.day-wd { font-size: 7pt; color: #666; }';
-    html += '.day-sun .day-wd { color: #c00; }';
-    html += '.day-sat .day-wd { color: #00c; }';
-    html += '.day-today { background: #fff3ea; }';
-    html += '.timeline { position: relative; width: ' + PRINT_TIMELINE_W + 'px; flex-shrink: 0; background: #fafaf7; }';
-    html += '.h-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #ddd; }';
-    html += '.h-line.major { background: #aaa; }';
-    html += '.bar { position: absolute; border-radius: 3px; color: #fff; font-size: 7px; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }';
-    html += '.slot-bg { position: absolute; top: 0; bottom: 0; border-left: 2px solid rgba(0,0,0,0.12); }';
-    html += '@page { size: A4 landscape; margin: 6mm; }';
-    html += '@media print { body { padding: 0; } }';
+    // body全体をA4横向きの高さいっぱいに
+    html += 'html, body { width: 100%; height: 100%; }';
+    html += 'body { font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif; display: flex; flex-direction: column; padding: 5mm; }';
+    html += 'h2 { font-size: 10pt; font-weight: 900; flex-shrink: 0; margin-bottom: 2px; }';
+    // グリッド全体がbodyの残り高さをすべて使う
+    html += '.grid { flex: 1; display: flex; flex-direction: column; border: 1.5px solid #555; overflow: hidden; }';
+    // 時間ヘッダー
+    html += '.hour-header { display: flex; flex-shrink: 0; border-bottom: 2px solid #222; height: 18px; }';
+    html += '.hh-spacer { width: 54px; flex-shrink: 0; background: #1C1B19; }';
+    html += '.hh-cells { flex: 1; display: flex; }';
+    html += '.hh-cell { flex: 1; font-size: 6.5px; color: #444; padding: 2px 0 0 1px; border-left: 1px solid #ccc; overflow: hidden; }';
+    html += '.hh-cell.major { border-left: 1px solid #888; }';
+    // 各日行: 均等にflexで縦を埋める
+    html += '.day-rows { flex: 1; display: flex; flex-direction: column; }';
+    html += '.day-row { flex: 1; display: flex; border-top: 1.5px solid #777; min-height: 0; }';
+    html += '.day-label { width: 54px; flex-shrink: 0; padding: 2px 3px; background: #f5f3ee; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid #888; }';
+    html += '.day-date { font-size: 8.5pt; font-weight: 900; line-height: 1.2; }';
+    html += '.day-wd { font-size: 6.5pt; color: #666; }';
+    html += '.sun .day-wd { color: #c00; }';
+    html += '.sat .day-wd { color: #006; }';
+    html += '.today .day-label { background: #fff3ea; }';
+    // タイムライン: flex:1で残り幅を全部使い、positionは相対
+    html += '.timeline { flex: 1; position: relative; background: #fafaf7; overflow: hidden; }';
+    html += '.h-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #e0e0e0; }';
+    html += '.h-line.major { background: #999; }';
+    html += '.slot-bg { position: absolute; top: 0; bottom: 0; }';
+    // バーは印刷時に色が出るように
+    html += '.bar { position: absolute; border-radius: 2px; color: #fff; font-size: 6.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }';
+    html += '@page { size: A4 landscape; margin: 5mm; }';
+    html += '@media print { html, body { height: 100vh; } }';
     html += '</style></head><body>';
     html += '<h2>シフト管理表 ' + weekLabel + '</h2>';
     html += '<div class="grid">';
 
-    // 時間ヘッダー
-    html += '<div class="hour-header"><div class="hh-spacer"></div>';
+    // 時間ヘッダー(24列をflexで均等割り)
+    html += '<div class="hour-header"><div class="hh-spacer"></div><div class="hh-cells">';
     for (var hi = 0; hi < 24; hi++) {
       var hLabel = ((8 + hi) % 24) + ':00';
-      html += '<div class="hh-cell">' + hLabel + '</div>';
+      var isMajor = hi % 6 === 0;
+      html += '<div class="hh-cell' + (isMajor ? ' major' : '') + '">' + hLabel + '</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // 各日行
-    var todayKey = dateKey(new Date());
-    days.forEach(function(d) {
-      var dKey = dateKey(d);
-      var rc = computeRows(dKey);
-      var placements = rc.placements;
-      var rowCount = Math.max(rc.rowCount, 1);
-      var rowH = Math.max(PRINT_ROW_H, rowCount * PRINT_ROW_H);
+    html += '<div class="day-rows">';
+    dayData.forEach(function(dd) {
+      var d = dd.d, placements = dd.placements, rowCount = dd.rowCount;
       var isSun = d.getDay() === 0;
       var isSat = d.getDay() === 6;
-      var isToday = dKey === todayKey;
-      var dayClass = 'day-row' + (isSun ? ' day-sun' : isSat ? ' day-sat' : '') + (isToday ? ' day-today' : '');
+      var isToday = dd.dKey === todayKey;
+      var cls = 'day-row' + (isSun ? ' sun' : '') + (isSat ? ' sat' : '') + (isToday ? ' today' : '');
 
-      html += '<div class="' + dayClass + '">';
-      html += '<div class="day-label' + (isToday ? ' day-today' : '') + '">';
+      html += '<div class="' + cls + '">';
+      html += '<div class="day-label">';
       html += '<div class="day-date">' + (d.getMonth()+1) + '/' + d.getDate() + '</div>';
       html += '<div class="day-wd">(' + WEEKDAY_JA[d.getDay()] + ')</div>';
       html += '</div>';
+      html += '<div class="timeline">';
 
-      html += '<div class="timeline" style="height:' + rowH + 'px;">';
-
-      // 縦線
+      // 縦線(24本をパーセントで配置)
       for (var li = 0; li < 24; li++) {
-        html += '<div class="h-line' + (li % 6 === 0 ? ' major' : '') + '" style="left:' + (li * PRINT_HOUR_W) + 'px;"></div>';
+        var pct = (li / 24 * 100).toFixed(4);
+        html += '<div class="h-line' + (li % 6 === 0 ? ' major' : '') + '" style="left:' + pct + '%;"></div>';
       }
 
-      // SLOT背景(state.showCostに関係なく必要人数ラベルは省略、背景のみ)
+      // SLOT背景
       SLOTS.forEach(function(slot) {
-        var slotL = (slot.startMin / 60) * PRINT_HOUR_W;
-        var slotW = ((slot.endMin - slot.startMin) / 60) * PRINT_HOUR_W;
+        var lPct = (slot.startMin / 1440 * 100).toFixed(4);
+        var wPct = ((slot.endMin - slot.startMin) / 1440 * 100).toFixed(4);
         var overlapping = placements.filter(function(p) { return p.entry.start < slot.endMin && p.entry.end > slot.startMin; }).length;
-        var bg = overlapping < slot.min ? 'rgba(214,64,44,0.08)' : 'transparent';
-        html += '<div class="slot-bg" style="left:' + slotL + 'px;width:' + slotW + 'px;background:' + bg + ';border-left-color:' + slot.tint + '55;"></div>';
+        var bg = overlapping < slot.min ? 'rgba(214,64,44,0.07)' : 'transparent';
+        html += '<div class="slot-bg" style="left:' + lPct + '%;width:' + wPct + '%;background:' + bg + ';border-left:1.5px solid ' + slot.tint + '44;"></div>';
       });
 
-      // 勤務バー
+      // 勤務バー(高さもパーセントで配置)
       placements.forEach(function(pl) {
         var entry = pl.entry, row = pl.row;
         var s = sById[entry.staffId];
         if (!s) return;
-        var barL = (entry.start / 60) * PRINT_HOUR_W;
-        var barW = Math.max(((entry.end - entry.start) / 60) * PRINT_HOUR_W, 20);
-        var barTop = row * PRINT_ROW_H + 3;
-        var barH = PRINT_ROW_H - 6;
+        var lPct = (entry.start / 1440 * 100).toFixed(4);
+        var wPct = (Math.max((entry.end - entry.start), 30) / 1440 * 100).toFixed(4);
+        // 縦方向: rowCountで均等割り
+        var topPct = (row / maxRowCount * 100 + 1).toFixed(2);
+        var hPct = (1 / maxRowCount * 100 - 2).toFixed(2);
         var label = s.name;
         if (entry.breakMin) label += '(休' + entry.breakMin + '分)';
-        html += '<div class="bar" style="left:' + barL + 'px;top:' + barTop + 'px;width:' + (barW-2) + 'px;height:' + barH + 'px;background:' + s.color + ';">' + label + '</div>';
+        html += '<div class="bar" style="left:' + lPct + '%;width:' + wPct + '%;top:' + topPct + '%;height:' + hPct + '%;background:' + s.color + ';">' + label + '</div>';
       });
 
       html += '</div></div>';
     });
 
-    html += '</div>';
-    html += '<script>window.onload = function(){ window.print(); };<\/script>';
+    html += '</div></div>';
+    html += '<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>';
     html += '</body></html>';
 
     var win = window.open('', '_blank');
