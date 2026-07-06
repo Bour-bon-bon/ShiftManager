@@ -604,7 +604,7 @@ function startApp() {
     var days = getDays();
     var sById = staffById();
     var weekLabel = (state.weekStart.getMonth() + 1) + "/" + state.weekStart.getDate() +
-                    " – " + (addDays(state.weekStart, 6).getMonth() + 1) + "/" + addDays(state.weekStart, 6).getDate();
+                    " \u2013 " + (addDays(state.weekStart, 6).getMonth() + 1) + "/" + addDays(state.weekStart, 6).getDate();
 
     var todayKey = dateKey(new Date());
     var dayData = days.map(function(d) {
@@ -614,113 +614,125 @@ function startApp() {
     });
     var maxRowCount = dayData.reduce(function(m, dd) { return Math.max(m, dd.rowCount); }, 1);
 
-    // A4横: 297mm × 210mm、余白5mmずつ
-    // 印刷可能領域: 287mm × 200mm
-    // タイトル行: 10mm、時間ヘッダー: 8mm → 残り182mmを7日で割る = 約26mm/日
-    var PAGE_W = 287;  // mm
-    var PAGE_H = 200;  // mm
-    var TITLE_H = 9;   // mm
-    var HDR_H = 7;     // mm
-    var DAY_H = ((PAGE_H - TITLE_H - HDR_H) / 7).toFixed(2); // mm per day
-    var LABEL_W = 18;  // mm
-    var TIMELINE_W = PAGE_W - LABEL_W; // mm
+    // SVGの論理座標系 (A4横向き比率: 297:210)
+    var VW = 2970, VH = 2100; // viewBox単位
+    var PAD = 40;
+    var TITLE_H = 80;
+    var HDR_H = 60;
+    var LABEL_W = 200;
+    var GRID_X = PAD + LABEL_W;
+    var GRID_Y = PAD + TITLE_H + HDR_H;
+    var GRID_W = VW - PAD - GRID_X;
+    var GRID_H = VH - PAD - GRID_Y;
+    var DAY_H = GRID_H / 7;
+    var HOUR_W = GRID_W / 24;
 
-    var html = '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">';
-    html += '<style>';
-    html += '* { box-sizing: border-box; margin: 0; padding: 0; }';
-    // 固定mmサイズで描画
-    html += 'html { width: ' + PAGE_W + 'mm; height: ' + PAGE_H + 'mm; }';
-    html += 'body { width: ' + PAGE_W + 'mm; height: ' + PAGE_H + 'mm; overflow: hidden; font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif; display: flex; flex-direction: column; }';
-    html += '.title { height: ' + TITLE_H + 'mm; display: flex; align-items: center; padding: 0 1mm; }';
-    html += '.title h2 { font-size: 12pt; font-weight: 900; }';
-    html += '.grid { width: ' + PAGE_W + 'mm; flex: 1; display: flex; flex-direction: column; border: 1.5px solid #444; }';
-    // 時間ヘッダー行
-    html += '.hdr { height: ' + HDR_H + 'mm; display: flex; flex-shrink: 0; border-bottom: 2px solid #222; }';
-    html += '.hdr-spacer { width: ' + LABEL_W + 'mm; background: #1C1B19; flex-shrink: 0; border-right: 1px solid #888; }';
-    html += '.hdr-cells { flex: 1; display: flex; }';
-    html += '.hdr-cell { flex: 1; font-size: 6pt; color: #333; display: flex; align-items: center; padding-left: 0.5mm; border-left: 1px solid #ccc; overflow: hidden; }';
-    html += '.hdr-cell.major { border-left: 1px solid #777; font-weight: 700; }';
-    // 日行
-    html += '.days { flex: 1; display: flex; flex-direction: column; }';
-    html += '.day { height: ' + DAY_H + 'mm; display: flex; border-top: 1.5px solid #777; }';
-    html += '.dlabel { width: ' + LABEL_W + 'mm; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 1.5mm; border-right: 1px solid #888; background: #f5f3ee; }';
-    html += '.dlabel.today { background: #fff3ea; }';
-    html += '.ddate { font-size: 10pt; font-weight: 900; line-height: 1.1; }';
-    html += '.dwd { font-size: 7pt; color: #555; }';
-    html += '.sun .dwd { color: #c00; }';
-    html += '.sat .dwd { color: #006; }';
-    html += '.tl { flex: 1; position: relative; overflow: hidden; background: #fafaf7; }';
-    html += '.vline { position: absolute; top: 0; bottom: 0; width: 0.3mm; background: #ddd; }';
-    html += '.vline.major { background: #999; width: 0.4mm; }';
-    html += '.slotbg { position: absolute; top: 0; bottom: 0; }';
-    html += '.bar { position: absolute; border-radius: 1mm; color: #fff; font-size: 6.5pt; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }';
-    html += '@page { size: A4 landscape; margin: 5mm; }';
-    html += '@media print { html, body { width: ' + PAGE_W + 'mm; height: ' + PAGE_H + 'mm; overflow: hidden; } }';
-    html += '</style></head><body>';
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + VW + ' ' + VH + '" width="100%" height="100%">';
 
-    html += '<div class="title"><h2>シフト管理表 ' + weekLabel + '</h2></div>';
-    html += '<div class="grid">';
+    // 背景
+    svg += '<rect width="' + VW + '" height="' + VH + '" fill="white"/>';
+
+    // タイトル
+    svg += '<text x="' + (PAD + LABEL_W) + '" y="' + (PAD + 55) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
+    svg += '\u30b7\u30d5\u30c8\u7ba1\u7406\u8868 ' + weekLabel + '</text>';
+
+    // ヘッダー背景(黒)
+    var hdrY = PAD + TITLE_H;
+    svg += '<rect x="' + PAD + '" y="' + hdrY + '" width="' + LABEL_W + '" height="' + HDR_H + '" fill="#1C1B19"/>';
 
     // 時間ヘッダー
-    html += '<div class="hdr"><div class="hdr-spacer"></div><div class="hdr-cells">';
     for (var hi = 0; hi < 24; hi++) {
+      var hx = GRID_X + hi * HOUR_W;
       var hLabel = ((8 + hi) % 24) + ':00';
       var isMajor = hi % 3 === 0;
-      html += '<div class="hdr-cell' + (isMajor ? ' major' : '') + '">' + hLabel + '</div>';
+      svg += '<rect x="' + hx + '" y="' + hdrY + '" width="' + HOUR_W + '" height="' + HDR_H + '" fill="' + (isMajor ? '#F0EDE6' : '#FAF7F0') + '" stroke="#aaa" stroke-width="0.5"/>';
+      svg += '<text x="' + (hx + 6) + '" y="' + (hdrY + 40) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="' + (isMajor ? 32 : 26) + '" font-weight="' + (isMajor ? '700' : '400') + '" fill="#333">' + hLabel + '</text>';
     }
-    html += '</div></div>';
 
-    // 各日
-    html += '<div class="days">';
-    dayData.forEach(function(dd) {
+    // 各日行
+    dayData.forEach(function(dd, di) {
       var d = dd.d, placements = dd.placements, rowCount = dd.rowCount;
-      var isSun = d.getDay() === 0, isSat = d.getDay() === 6;
-      var isToday = dd.dKey === todayKey;
-      var cls = 'day' + (isSun ? ' sun' : isSat ? ' sat' : '');
+      var isSun = d.getDay() === 0, isSat = d.getDay() === 6, isToday = dd.dKey === todayKey;
+      var rowY = GRID_Y + di * DAY_H;
 
-      html += '<div class="' + cls + '">';
-      html += '<div class="dlabel' + (isToday ? ' today' : '') + '">';
-      html += '<div class="ddate">' + (d.getMonth()+1) + '/' + d.getDate() + '</div>';
-      html += '<div class="dwd">(' + WEEKDAY_JA[d.getDay()] + ')</div>';
-      html += '</div>';
-      html += '<div class="tl">';
+      // 日付ラベル背景
+      var labelFill = isToday ? '#FFF3EA' : '#F5F3EE';
+      svg += '<rect x="' + PAD + '" y="' + rowY + '" width="' + LABEL_W + '" height="' + DAY_H + '" fill="' + labelFill + '" stroke="#888" stroke-width="1"/>';
 
-      // 縦線(24本 %)
-      for (var li = 0; li < 24; li++) {
-        var lp = (li / 24 * 100).toFixed(3);
-        html += '<div class="vline' + (li % 3 === 0 ? ' major' : '') + '" style="left:' + lp + '%;"></div>';
-      }
+      // 日付テキスト
+      var wdColor = isSun ? '#CC0000' : isSat ? '#000066' : '#555555';
+      svg += '<text x="' + (PAD + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="52" font-weight="900" fill="#1C1B19">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
+      svg += '<text x="' + (PAD + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
+
+      // タイムライン背景
+      svg += '<rect x="' + GRID_X + '" y="' + rowY + '" width="' + GRID_W + '" height="' + DAY_H + '" fill="#FAFAF7" stroke="#888" stroke-width="1"/>';
 
       // SLOT背景
       SLOTS.forEach(function(slot) {
-        var lp = (slot.startMin / 1440 * 100).toFixed(3);
-        var wp = ((slot.endMin - slot.startMin) / 1440 * 100).toFixed(3);
+        var slotX = GRID_X + slot.startMin / 1440 * GRID_W;
+        var slotW = (slot.endMin - slot.startMin) / 1440 * GRID_W;
         var ov = placements.filter(function(p){ return p.entry.start < slot.endMin && p.entry.end > slot.startMin; }).length;
-        var bg = ov < slot.min ? 'rgba(214,64,44,0.07)' : 'transparent';
-        html += '<div class="slotbg" style="left:' + lp + '%;width:' + wp + '%;background:' + bg + ';border-left:1px solid ' + slot.tint + '55;"></div>';
+        if (ov < slot.min) {
+          svg += '<rect x="' + slotX + '" y="' + rowY + '" width="' + slotW + '" height="' + DAY_H + '" fill="rgba(214,64,44,0.06)"/>';
+        }
+        svg += '<line x1="' + slotX + '" y1="' + rowY + '" x2="' + slotX + '" y2="' + (rowY + DAY_H) + '" stroke="' + slot.tint + '" stroke-width="2" opacity="0.4"/>';
       });
 
-      // 勤務バー(高さ%)
+      // 縦の時間線
+      for (var li = 1; li < 24; li++) {
+        var lx = GRID_X + li * HOUR_W;
+        var isMaj = li % 6 === 0;
+        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="' + (isMaj ? '#999' : '#DDD') + '" stroke-width="' + (isMaj ? '1.5' : '0.8') + '"/>';
+      }
+
+      // 勤務バー
       placements.forEach(function(pl) {
         var entry = pl.entry, row = pl.row, s = sById[entry.staffId];
         if (!s) return;
-        var lp = (entry.start / 1440 * 100).toFixed(3);
-        var wp = (Math.max(entry.end - entry.start, 30) / 1440 * 100).toFixed(3);
-        var tp = (row / maxRowCount * 100 + 2).toFixed(2);
-        var hp = (1 / maxRowCount * 100 - 4).toFixed(2);
-        var label = s.name + (entry.breakMin ? '(休' + entry.breakMin + '分)' : '');
-        html += '<div class="bar" style="left:' + lp + '%;width:' + wp + '%;top:' + tp + '%;height:' + hp + '%;background:' + s.color + ';">' + label + '</div>';
+        var bx = GRID_X + entry.start / 1440 * GRID_W;
+        var bw = Math.max((entry.end - entry.start) / 1440 * GRID_W, 30);
+        var rowSlotH = DAY_H / maxRowCount;
+        var by = rowY + row * rowSlotH + rowSlotH * 0.1;
+        var bh = rowSlotH * 0.8;
+        var rx = 8;
+        // 角丸四角
+        svg += '<rect x="' + bx + '" y="' + by + '" width="' + (bw - 4) + '" height="' + bh + '" rx="' + rx + '" fill="' + s.color + '"/>';
+        // バー内テキスト
+        var label = s.name + (entry.breakMin ? '(\u4f5c' + entry.breakMin + ')' : '');
+        var fontSize = Math.min(bh * 0.55, 38);
+        svg += '<text x="' + (bx + bw/2 - 2) + '" y="' + (by + bh * 0.65) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="' + fontSize + '" font-weight="700" fill="white" text-anchor="middle" clip-path="none">' + label + '</text>';
       });
-
-      html += '</div></div>';
     });
 
-    html += '</div></div>';
+    // グリッド外枠
+    svg += '<rect x="' + PAD + '" y="' + (PAD + TITLE_H) + '" width="' + (VW - PAD * 2) + '" height="' + (VH - PAD - PAD - TITLE_H) + '" fill="none" stroke="#333" stroke-width="2"/>';
+
+    // 日付行の横境界線
+    for (var di = 1; di < 7; di++) {
+      var lineY = GRID_Y + di * DAY_H;
+      svg += '<line x1="' + PAD + '" y1="' + lineY + '" x2="' + (VW - PAD) + '" y2="' + lineY + '" stroke="#777" stroke-width="2"/>';
+    }
+
+    svg += '</svg>';
+
+    var html = '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">';
+    html += '<style>';
+    html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
+    html += 'html, body { width: 100%; height: 100%; background: white; }';
+    html += 'body { display: flex; align-items: center; justify-content: center; }';
+    html += 'svg { display: block; width: 100%; height: 100%; }';
+    // 印刷時: SVGをページいっぱいに
+    html += '@page { size: A4 landscape; margin: 0; }';
+    html += '@media print {';
+    html += '  html, body { width: 297mm; height: 210mm; overflow: hidden; }';
+    html += '  svg { width: 297mm; height: 210mm; }';
+    html += '}';
+    html += '</style></head><body>' + svg;
     html += '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>';
     html += '</body></html>';
 
     var win = window.open('', '_blank');
-    if (!win) { showToast('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください', 'error'); return; }
+    if (!win) { showToast('\u30dd\u30c3\u30d7\u30a2\u30c3\u30d7\u304c\u30d6\u30ed\u30c3\u30af\u3055\u308c\u307e\u3057\u305f\u3002\u30d6\u30e9\u30a6\u30b6\u306e\u8a2d\u5b9a\u3067\u30dd\u30c3\u30d7\u30a2\u30c3\u30d7\u3092\u8a31\u53ef\u3057\u3066\u304f\u3060\u3055\u3044', 'error'); return; }
     win.document.write(html);
     win.document.close();
   }
