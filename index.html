@@ -616,15 +616,19 @@ function startApp() {
 
     // SVGの論理座標系 (A4横向き比率: 297:210)
     var VW = 2970, VH = 2100; // viewBox単位
-    var PAD = 40;
-    var TITLE_H = 80;
-    var HDR_H = 60;
-    var LABEL_W = 200;
-    var GRID_X = PAD + LABEL_W;
-    var GRID_Y = PAD + TITLE_H + HDR_H;
-    var GRID_W = VW - PAD - GRID_X;
-    var GRID_H = VH - PAD - GRID_Y;
-    var DAY_H = GRID_H / 7;
+    var PAD_T = 35;  // 上余白
+    var PAD_B = 55;  // 下余白(多めに取る)
+    var PAD_L = 35;  // 左余白
+    var PAD_R = 35;  // 右余白
+    var TITLE_H = 75;
+    var HDR_H = 58;
+    var LABEL_W = 195;
+    var GRID_X = PAD_L + LABEL_W;
+    var GRID_Y = PAD_T + TITLE_H + HDR_H;
+    var GRID_W = VW - PAD_L - PAD_R - LABEL_W;
+    var GRID_H = VH - PAD_T - PAD_B - TITLE_H - HDR_H;
+    var DAY_H = Math.floor(GRID_H / 7); // 切り捨てて確実に収める
+    var ACTUAL_H = DAY_H * 7;           // 実際に使うグリッド高さ
     var HOUR_W = GRID_W / 24;
 
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + VW + ' ' + VH + '" width="100%" height="100%">';
@@ -633,12 +637,12 @@ function startApp() {
     svg += '<rect width="' + VW + '" height="' + VH + '" fill="white"/>';
 
     // タイトル
-    svg += '<text x="' + (PAD + LABEL_W) + '" y="' + (PAD + 55) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
+    svg += '<text x="' + (PAD_L + LABEL_W) + '" y="' + (PAD_T + 52) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
     svg += '\u30b7\u30d5\u30c8\u7ba1\u7406\u8868 ' + weekLabel + '</text>';
 
     // ヘッダー背景(黒)
-    var hdrY = PAD + TITLE_H;
-    svg += '<rect x="' + PAD + '" y="' + hdrY + '" width="' + LABEL_W + '" height="' + HDR_H + '" fill="#1C1B19"/>';
+    var hdrY = PAD_T + TITLE_H;
+    svg += '<rect x="' + PAD_L + '" y="' + hdrY + '" width="' + LABEL_W + '" height="' + HDR_H + '" fill="#1C1B19"/>';
 
     // 時間ヘッダー
     for (var hi = 0; hi < 24; hi++) {
@@ -657,12 +661,12 @@ function startApp() {
 
       // 日付ラベル背景
       var labelFill = isToday ? '#FFF3EA' : '#F5F3EE';
-      svg += '<rect x="' + PAD + '" y="' + rowY + '" width="' + LABEL_W + '" height="' + DAY_H + '" fill="' + labelFill + '" stroke="#888" stroke-width="1"/>';
+      svg += '<rect x="' + PAD_L + '" y="' + rowY + '" width="' + LABEL_W + '" height="' + DAY_H + '" fill="' + labelFill + '" stroke="#888" stroke-width="1"/>';
 
       // 日付テキスト
       var wdColor = isSun ? '#CC0000' : isSat ? '#000066' : '#555555';
-      svg += '<text x="' + (PAD + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="52" font-weight="900" fill="#1C1B19">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
-      svg += '<text x="' + (PAD + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="52" font-weight="900" fill="#1C1B19">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
 
       // タイムライン背景
       svg += '<rect x="' + GRID_X + '" y="' + rowY + '" width="' + GRID_W + '" height="' + DAY_H + '" fill="#FAFAF7" stroke="#888" stroke-width="1"/>';
@@ -705,12 +709,12 @@ function startApp() {
     });
 
     // グリッド外枠
-    svg += '<rect x="' + PAD + '" y="' + (PAD + TITLE_H) + '" width="' + (VW - PAD * 2) + '" height="' + (VH - PAD - PAD - TITLE_H) + '" fill="none" stroke="#333" stroke-width="2"/>';
+    svg += '<rect x="' + PAD_L + '" y="' + (PAD_T + TITLE_H) + '" width="' + (LABEL_W + GRID_W) + '" height="' + (HDR_H + ACTUAL_H) + '" fill="none" stroke="#333" stroke-width="2"/>';
 
     // 日付行の横境界線
     for (var di = 1; di < 7; di++) {
       var lineY = GRID_Y + di * DAY_H;
-      svg += '<line x1="' + PAD + '" y1="' + lineY + '" x2="' + (VW - PAD) + '" y2="' + lineY + '" stroke="#777" stroke-width="2"/>';
+      svg += '<line x1="' + PAD_L + '" y1="' + lineY + '" x2="' + (PAD_L + LABEL_W + GRID_W) + '" y2="' + lineY + '" stroke="#777" stroke-width="2"/>';
     }
 
     svg += '</svg>';
