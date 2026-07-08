@@ -344,6 +344,22 @@ function startApp() {
   ];
   var HOUR_MARKS = Array.from({ length: 24 }, function (_, i) { return (DAY_START_HOUR + i) % 24; });
   var STAFF_COLORS = ["#E8590C", "#1D5B9B", "#1C7C54", "#A6334F", "#3D3A6B", "#B5862B", "#2F8F8F", "#8C4A2F", "#6B5B95", "#C2484A"];
+
+  // 日本の祝日 (2025-2027年) グローバル定義 - アプリ画面・PDF印刷の両方で使用
+  var HOLIDAYS = {
+    '2025-01-01':1,'2025-01-13':1,'2025-02-11':1,'2025-02-23':1,'2025-02-24':1,
+    '2025-03-20':1,'2025-04-29':1,'2025-05-03':1,'2025-05-04':1,'2025-05-05':1,
+    '2025-05-06':1,'2025-07-21':1,'2025-08-11':1,'2025-09-15':1,'2025-09-22':1,
+    '2025-09-23':1,'2025-10-13':1,'2025-11-03':1,'2025-11-23':1,'2025-11-24':1,
+    '2026-01-01':1,'2026-01-12':1,'2026-02-11':1,'2026-02-23':1,'2026-03-20':1,
+    '2026-04-29':1,'2026-05-03':1,'2026-05-04':1,'2026-05-05':1,'2026-05-06':1,
+    '2026-07-20':1,'2026-08-11':1,'2026-09-21':1,'2026-09-22':1,'2026-09-23':1,
+    '2026-10-12':1,'2026-11-03':1,'2026-11-23':1,
+    '2027-01-01':1,'2027-01-11':1,'2027-02-11':1,'2027-02-23':1,'2027-03-21':1,
+    '2027-04-29':1,'2027-05-03':1,'2027-05-04':1,'2027-05-05':1,'2027-07-19':1,
+    '2027-08-11':1,'2027-09-20':1,'2027-09-23':1,'2027-10-11':1,'2027-11-03':1,
+    '2027-11-23':1
+  };
   var ROW_H = 36, HEADER_W = 90, HOUR_W = 64, TIMELINE_W = HOUR_W * 24;
 
   function pad(n) { return String(n).padStart(2, "0"); }
@@ -631,21 +647,7 @@ function startApp() {
     var ACTUAL_H = DAY_H * 7;           // 実際に使うグリッド高さ
     var HOUR_W = GRID_W / 24;
 
-    // 祝日データ(日本の祝日 2025-2027年)
-    var HOLIDAYS = {
-      '2025-01-01':1,'2025-01-13':1,'2025-02-11':1,'2025-02-23':1,'2025-02-24':1,
-      '2025-03-20':1,'2025-04-29':1,'2025-05-03':1,'2025-05-04':1,'2025-05-05':1,
-      '2025-05-06':1,'2025-07-21':1,'2025-08-11':1,'2025-09-15':1,'2025-09-22':1,
-      '2025-09-23':1,'2025-10-13':1,'2025-11-03':1,'2025-11-23':1,'2025-11-24':1,
-      '2026-01-01':1,'2026-01-12':1,'2026-02-11':1,'2026-02-23':1,'2026-03-20':1,
-      '2026-04-29':1,'2026-05-03':1,'2026-05-04':1,'2026-05-05':1,'2026-05-06':1,
-      '2026-07-20':1,'2026-08-11':1,'2026-09-21':1,'2026-09-22':1,'2026-09-23':1,
-      '2026-10-12':1,'2026-11-03':1,'2026-11-23':1,
-      '2027-01-01':1,'2027-01-11':1,'2027-02-11':1,'2027-02-23':1,'2027-03-21':1,
-      '2027-04-29':1,'2027-05-03':1,'2027-05-04':1,'2027-05-05':1,'2027-07-19':1,
-      '2027-08-11':1,'2027-09-20':1,'2027-09-23':1,'2027-10-11':1,'2027-11-03':1,
-      '2027-11-23':1
-    };
+    // 祝日判定はグローバルのHOLIDAYSを使用
 
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + VW + ' ' + VH + '" width="100%" height="100%">';
 
@@ -653,7 +655,7 @@ function startApp() {
     svg += '<rect width="' + VW + '" height="' + VH + '" fill="white"/>';
 
     // タイトル
-    svg += '<text x="' + (PAD_L + LABEL_W) + '" y="' + (PAD_T + 52) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
+    svg += '<text x="' + (PAD_L + LABEL_W) + '" y="' + (PAD_T + 52) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
     svg += '\u30b7\u30d5\u30c8\u7ba1\u7406\u8868 ' + weekLabel + '</text>';
 
     // ヘッダー背景(黒)
@@ -668,7 +670,7 @@ function startApp() {
       // 背景は全て白地(交互色なし)
       svg += '<rect x="' + hx + '" y="' + hdrY + '" width="' + HOUR_W + '" height="' + HDR_H + '" fill="#FAF7F0" stroke="#aaa" stroke-width="0.5"/>';
       // テキストは全て同じサイズ・細字・同じ色
-      svg += '<text x="' + (hx + 5) + '" y="' + (hdrY + 40) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="28" font-weight="400" fill="#333">' + hLabel + '</text>';
+      svg += '<text x="' + (hx + 5) + '" y="' + (hdrY + 40) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="28" font-weight="400" fill="#333">' + hLabel + '</text>';
     }
 
     // 各日行
@@ -686,18 +688,21 @@ function startApp() {
       // 日付・曜日テキスト: 日曜または祝日は赤、土曜は紺、平日は黒
       var dateColor = (isSun || isHoliday) ? '#CC0000' : isSat ? '#000066' : '#1C1B19';
       var wdColor   = (isSun || isHoliday) ? '#CC0000' : isSat ? '#000066' : '#555555';
-      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="52" font-weight="900" fill="' + dateColor + '">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
-      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="52" font-weight="900" fill="' + dateColor + '">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
 
       // タイムライン背景: 白地
       svg += '<rect x="' + GRID_X + '" y="' + rowY + '" width="' + GRID_W + '" height="' + DAY_H + '" fill="#FFFFFF" stroke="#888" stroke-width="1"/>';
 
       // SLOT背景: 印刷版では色付けなし(全て白地で統一)
 
-      // 縦の時間線: 全て同じ色・同じ太さに統一
+      // 縦の時間線: 通常は薄く、SLOTの切り替わり時刻(8/9/13/17/22時)は濃く
+      var SLOT_START_MINS = [0, 60, 300, 540, 840]; // 8:00=0, 9:00=60, 13:00=300, 17:00=540, 22:00=840
       for (var li = 1; li < 24; li++) {
         var lx = GRID_X + li * HOUR_W;
-        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="#CCC" stroke-width="0.8"/>';
+        var lMin = li * 60; // この縦線が表す時刻(8:00起点の分)
+        var isSlotBorder = SLOT_START_MINS.indexOf(lMin) !== -1;
+        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="' + (isSlotBorder ? '#333' : '#CCC') + '" stroke-width="' + (isSlotBorder ? '3' : '0.8') + '"/>';
       }
 
       // 勤務バー
@@ -713,9 +718,9 @@ function startApp() {
         // 角丸四角
         svg += '<rect x="' + bx + '" y="' + by + '" width="' + (bw - 4) + '" height="' + bh + '" rx="' + rx + '" fill="' + s.color + '"/>';
         // バー内テキスト
-        var label = s.name + (entry.breakMin ? '(\u4f5c' + entry.breakMin + ')' : '');
+        var label = s.name + (entry.breakMin ? '(休憩' + entry.breakMin + '分)' : '');
         var fontSize = Math.min(bh * 0.55, 38);
-        svg += '<text x="' + (bx + bw/2 - 2) + '" y="' + (by + bh * 0.65) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="' + fontSize + '" font-weight="700" fill="white" text-anchor="middle" clip-path="none">' + label + '</text>';
+        svg += '<text x="' + (bx + bw/2 - 2) + '" y="' + (by + bh * 0.65) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="' + fontSize + '" font-weight="700" fill="white" text-anchor="middle" clip-path="none">' + label + '</text>';
       });
     });
 
