@@ -692,22 +692,12 @@ function startApp() {
       // タイムライン背景: 白地
       svg += '<rect x="' + GRID_X + '" y="' + rowY + '" width="' + GRID_W + '" height="' + DAY_H + '" fill="#FFFFFF" stroke="#888" stroke-width="1"/>';
 
-      // SLOT背景
-      SLOTS.forEach(function(slot) {
-        var slotX = GRID_X + slot.startMin / 1440 * GRID_W;
-        var slotW = (slot.endMin - slot.startMin) / 1440 * GRID_W;
-        var ov = placements.filter(function(p){ return p.entry.start < slot.endMin && p.entry.end > slot.startMin; }).length;
-        if (ov < slot.min) {
-          svg += '<rect x="' + slotX + '" y="' + rowY + '" width="' + slotW + '" height="' + DAY_H + '" fill="rgba(214,64,44,0.06)"/>';
-        }
-        svg += '<line x1="' + slotX + '" y1="' + rowY + '" x2="' + slotX + '" y2="' + (rowY + DAY_H) + '" stroke="' + slot.tint + '" stroke-width="2" opacity="0.4"/>';
-      });
+      // SLOT背景: 印刷版では色付けなし(全て白地で統一)
 
-      // 縦の時間線
+      // 縦の時間線: 全て同じ色・同じ太さに統一
       for (var li = 1; li < 24; li++) {
         var lx = GRID_X + li * HOUR_W;
-        var isMaj = li % 6 === 0;
-        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="' + (isMaj ? '#999' : '#DDD') + '" stroke-width="' + (isMaj ? '1.5' : '0.8') + '"/>';
+        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="#CCC" stroke-width="0.8"/>';
       }
 
       // 勤務バー
