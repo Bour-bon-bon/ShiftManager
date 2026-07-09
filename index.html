@@ -322,6 +322,15 @@ function startApp() {
   // ヘッダーボタン専用アイコン
   // 金額表示: 円マーク（¥）
   function iconYen(size, color) { return svgIcon('<line x1="12" y1="12" x2="12" y2="21"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="14" x2="16" y2="14"/><path d="M17 4L12 11L7 4"/>', size, color); }
+  // 白黒印刷アイコン: 円の半分を塗りつぶし(モノクロ表現)
+  function iconMono(size, color) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", size || 16);
+    svg.setAttribute("height", size || 16);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.innerHTML = '<circle cx="12" cy="12" r="9" fill="none" stroke="' + (color || "currentColor") + '" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="' + (color || "currentColor") + '"/>';
+    return svg;
+  }
   // PDF出力: ファイルに下向き矢印
   function iconFilePrint(size, color) { return svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 15 12 18 15 15"/>', size, color); }
   // エクスポート: ファイルに上向き矢印（送り出す）
@@ -344,22 +353,6 @@ function startApp() {
   ];
   var HOUR_MARKS = Array.from({ length: 24 }, function (_, i) { return (DAY_START_HOUR + i) % 24; });
   var STAFF_COLORS = ["#E8590C", "#1D5B9B", "#1C7C54", "#A6334F", "#3D3A6B", "#B5862B", "#2F8F8F", "#8C4A2F", "#6B5B95", "#C2484A"];
-
-  // 日本の祝日 (2025-2027年) グローバル定義 - アプリ画面・PDF印刷の両方で使用
-  var HOLIDAYS = {
-    '2025-01-01':1,'2025-01-13':1,'2025-02-11':1,'2025-02-23':1,'2025-02-24':1,
-    '2025-03-20':1,'2025-04-29':1,'2025-05-03':1,'2025-05-04':1,'2025-05-05':1,
-    '2025-05-06':1,'2025-07-21':1,'2025-08-11':1,'2025-09-15':1,'2025-09-22':1,
-    '2025-09-23':1,'2025-10-13':1,'2025-11-03':1,'2025-11-23':1,'2025-11-24':1,
-    '2026-01-01':1,'2026-01-12':1,'2026-02-11':1,'2026-02-23':1,'2026-03-20':1,
-    '2026-04-29':1,'2026-05-03':1,'2026-05-04':1,'2026-05-05':1,'2026-05-06':1,
-    '2026-07-20':1,'2026-08-11':1,'2026-09-21':1,'2026-09-22':1,'2026-09-23':1,
-    '2026-10-12':1,'2026-11-03':1,'2026-11-23':1,
-    '2027-01-01':1,'2027-01-11':1,'2027-02-11':1,'2027-02-23':1,'2027-03-21':1,
-    '2027-04-29':1,'2027-05-03':1,'2027-05-04':1,'2027-05-05':1,'2027-07-19':1,
-    '2027-08-11':1,'2027-09-20':1,'2027-09-23':1,'2027-10-11':1,'2027-11-03':1,
-    '2027-11-23':1
-  };
   var ROW_H = 36, HEADER_W = 90, HOUR_W = 64, TIMELINE_W = HOUR_W * 24;
 
   function pad(n) { return String(n).padStart(2, "0"); }
@@ -426,6 +419,7 @@ function startApp() {
     editingEntry: null,
     copiedDKey: null,
     showCost: true,
+    printMono: false,
     toast: null
   };
   var toastTimer = null;
@@ -655,7 +649,7 @@ function startApp() {
     svg += '<rect width="' + VW + '" height="' + VH + '" fill="white"/>';
 
     // タイトル
-    svg += '<text x="' + (PAD_L + LABEL_W) + '" y="' + (PAD_T + 52) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
+    svg += '<text x="' + (PAD_L + LABEL_W) + '" y="' + (PAD_T + 52) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="55" font-weight="900" fill="#1C1B19">';
     svg += '\u30b7\u30d5\u30c8\u7ba1\u7406\u8868 ' + weekLabel + '</text>';
 
     // ヘッダー背景(黒)
@@ -670,7 +664,7 @@ function startApp() {
       // 背景は全て白地(交互色なし)
       svg += '<rect x="' + hx + '" y="' + hdrY + '" width="' + HOUR_W + '" height="' + HDR_H + '" fill="#FAF7F0" stroke="#aaa" stroke-width="0.5"/>';
       // テキストは全て同じサイズ・細字・同じ色
-      svg += '<text x="' + (hx + 5) + '" y="' + (hdrY + 40) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="28" font-weight="400" fill="#333">' + hLabel + '</text>';
+      svg += '<text x="' + (hx + 5) + '" y="' + (hdrY + 40) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="28" font-weight="400" fill="#333">' + hLabel + '</text>';
     }
 
     // 各日行
@@ -682,14 +676,14 @@ function startApp() {
       var rowY = GRID_Y + di * DAY_H;
 
       // 日付ラベル背景: 全て白地
-      var labelFill = isToday ? '#FFF3EA' : '#FFFFFF';
+      var labelFill = (isToday && !state.printMono) ? '#FFF3EA' : '#FFFFFF';
       svg += '<rect x="' + PAD_L + '" y="' + rowY + '" width="' + LABEL_W + '" height="' + DAY_H + '" fill="' + labelFill + '" stroke="#888" stroke-width="1"/>';
 
       // 日付・曜日テキスト: 日曜または祝日は赤、土曜は紺、平日は黒
       var dateColor = (isSun || isHoliday) ? '#CC0000' : isSat ? '#000066' : '#1C1B19';
       var wdColor   = (isSun || isHoliday) ? '#CC0000' : isSat ? '#000066' : '#555555';
-      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="52" font-weight="900" fill="' + dateColor + '">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
-      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.44) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="52" font-weight="900" fill="' + dateColor + '">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>';
+      svg += '<text x="' + (PAD_L + 14) + '" y="' + (rowY + DAY_H * 0.74) + '" font-family="-apple-system,Helvetica,sans-serif" font-size="36" fill="' + wdColor + '">(' + WEEKDAY_JA[d.getDay()] + ')</text>';
 
       // タイムライン背景: 白地
       svg += '<rect x="' + GRID_X + '" y="' + rowY + '" width="' + GRID_W + '" height="' + DAY_H + '" fill="#FFFFFF" stroke="#888" stroke-width="1"/>';
@@ -702,7 +696,7 @@ function startApp() {
         var lx = GRID_X + li * HOUR_W;
         var lMin = li * 60; // この縦線が表す時刻(8:00起点の分)
         var isSlotBorder = SLOT_START_MINS.indexOf(lMin) !== -1;
-        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="' + (isSlotBorder ? '#333' : '#CCC') + '" stroke-width="' + (isSlotBorder ? '3' : '0.8') + '"/>';
+        svg += '<line x1="' + lx + '" y1="' + rowY + '" x2="' + lx + '" y2="' + (rowY + DAY_H) + '" stroke="' + (isSlotBorder ? '#666' : '#CCC') + '" stroke-width="' + (isSlotBorder ? '1.5' : '0.8') + '"/>';
       }
 
       // 勤務バー
@@ -715,12 +709,15 @@ function startApp() {
         var by = rowY + row * rowSlotH + rowSlotH * 0.1;
         var bh = rowSlotH * 0.8;
         var rx = 8;
+        var barFill = state.printMono ? "#FFFFFF" : s.color;
+        var barStroke = state.printMono ? "#1C1B19" : "none";
+        var textFill = state.printMono ? "#1C1B19" : "white";
         // 角丸四角
-        svg += '<rect x="' + bx + '" y="' + by + '" width="' + (bw - 4) + '" height="' + bh + '" rx="' + rx + '" fill="' + s.color + '"/>';
+        svg += '<rect x="' + bx + '" y="' + by + '" width="' + (bw - 4) + '" height="' + bh + '" rx="' + rx + '" fill="' + barFill + '" stroke="' + barStroke + '" stroke-width="1.5"/>';
         // バー内テキスト
         var label = s.name + (entry.breakMin ? '(休憩' + entry.breakMin + '分)' : '');
         var fontSize = Math.min(bh * 0.55, 38);
-        svg += '<text x="' + (bx + bw/2 - 2) + '" y="' + (by + bh * 0.65) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="' + fontSize + '" font-weight="700" fill="white" text-anchor="middle" clip-path="none">' + label + '</text>';
+        svg += '<text x="' + (bx + bw/2 - 2) + '" y="' + (by + bh * 0.65) + '" font-family="Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Meiryo, -apple-system, sans-serif" font-size="' + fontSize + '" font-weight="700" fill="' + textFill + '" text-anchor="middle" clip-path="none">' + label + '</text>';
       });
     });
 
@@ -838,6 +835,10 @@ function startApp() {
               class: "toggle-btn" + (state.showCost ? " active" : ""),
               onclick: function () { state.showCost = !state.showCost; render(); }
             }, [iconYen(14), el("span", { class: "btn-label" }, [document.createTextNode(state.showCost ? " 金額表示" : " 金額非表示")])]),
+            el("button", {
+              class: "toggle-btn" + (state.printMono ? " active" : ""),
+              onclick: function () { state.printMono = !state.printMono; render(); }
+            }, [iconMono(14), el("span", { class: "btn-label" }, [document.createTextNode(state.printMono ? " 白黒印刷" : " カラー印刷")])]),
             el("button", { class: "logout-btn", onclick: function () { printShift(); } }, [
               iconFilePrint(14), el("span", { class: "btn-label" }, [document.createTextNode(" PDF出力")])
             ]),
