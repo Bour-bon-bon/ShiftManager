@@ -653,8 +653,9 @@ function startApp() {
     var GRID_Y = PAD_T + TITLE_H + HDR_H;
     var GRID_W = VW - PAD_L - PAD_R - LABEL_W;
     var GRID_H = VH - PAD_T - PAD_B - TITLE_H - HDR_H;
-    var DAY_H = Math.floor(GRID_H / 7); // 切り捨てて確実に収める
-    var ACTUAL_H = DAY_H * 7;           // 実際に使うグリッド高さ
+    var GAP = 30; // 日付行同士の隙間(viewBox単位)
+    var DAY_H = Math.floor((GRID_H - GAP * 6) / 7); // 7行・間の隙間6箇所ぶんを引いて計算
+    var ACTUAL_H = DAY_H * 7 + GAP * 6;              // 実際に使うグリッド高さ(隙間込み)
     var HOUR_W = GRID_W / 24;
 
     // 祝日判定はグローバルのHOLIDAYSを使用
@@ -689,7 +690,13 @@ function startApp() {
       var isSun = d.getDay() === 0, isSat = d.getDay() === 6, isToday = dd.dKey === todayKey;
       var dkStr = dd.dKey; // 'YYYY-MM-DD'
       var isHoliday = !!HOLIDAYS[dkStr];
-      var rowY = GRID_Y + di * DAY_H;
+      var rowY = GRID_Y + di * (DAY_H + GAP);
+
+      // 日付の境目に濃い罫線(隙間の中央、2行目以降のみ)
+      if (di > 0) {
+        var borderY = rowY - GAP / 2;
+        svg += '<line x1="' + PAD_L + '" y1="' + borderY + '" x2="' + (PAD_L + LABEL_W + GRID_W) + '" y2="' + borderY + '" stroke="#1C1B19" stroke-width="2.5"/>';
+      }
 
       // 日付ラベル背景: 全て白地
       var labelFill = (isToday && !state.printMono) ? '#FFF3EA' : '#FFFFFF';
@@ -739,12 +746,6 @@ function startApp() {
 
     // グリッド外枠
     svg += '<rect x="' + PAD_L + '" y="' + (PAD_T + TITLE_H) + '" width="' + (LABEL_W + GRID_W) + '" height="' + (HDR_H + ACTUAL_H) + '" fill="none" stroke="#333" stroke-width="2"/>';
-
-    // 日付行の横境界線
-    for (var di = 1; di < 7; di++) {
-      var lineY = GRID_Y + di * DAY_H;
-      svg += '<line x1="' + PAD_L + '" y1="' + lineY + '" x2="' + (PAD_L + LABEL_W + GRID_W) + '" y2="' + lineY + '" stroke="#777" stroke-width="2"/>';
-    }
 
     svg += '</svg>';
 
@@ -882,13 +883,25 @@ function startApp() {
   // 月次人件費: 現在表示中の週が属する月の1日〜末日の合計を計算
   function calcMonthCost() {
     var refDate = state.weekStart;
-    var year = refDate.getFullYear();
-    var month = refDate.getMonth();
-    var firstDay = new Date(year, month, 1);
-    var lastDay = new Date(year, month + 1, 0);
+    var y = refDate.getFullYear();
+    var m = refDate.getMonth();
+    var d = refDate.getDate();
+    var periodStart, periodEnd;
+    if (d >= 16) {
+      // 当月16日 〜 翌月15日
+      periodStart = new Date(y, m, 16);
+      periodEnd = new Date(y, m + 1, 15);
+    } else {
+      // 前月16日 〜 当月15日
+      periodStart = new Date(y, m - 1, 16);
+      periodEnd = new Date(y, m, 15);
+    }
+    var labelYear = periodEnd.getFullYear();
+    var labelMonth = periodEnd.getMonth() + 1;
+
     var total = 0, dispatchFee = 0;
-    for (var d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-      var key = dateKey(new Date(d));
+    for (var cur = new Date(periodStart); cur <= periodEnd; cur.setDate(cur.getDate() + 1)) {
+      var key = dateKey(new Date(cur));
       var entries = state.entriesByDate[key];
       if (!entries) {
         try {
@@ -902,7 +915,7 @@ function startApp() {
         dispatchFee += c.fee;
       });
     }
-    return { total: total, dispatchFee: dispatchFee, year: year, month: month + 1 };
+    return { total: total, dispatchFee: dispatchFee, year: labelYear, month: labelMonth };
   }
 
   function renderWeekNav() {
@@ -923,10 +936,10 @@ function startApp() {
       children.push(el("div", { class: "badge-cost", text: "週計 ¥" + weekTotalCost.toLocaleString() }));
     }
     if (state.showCost && monthData.total > 0) {
-      children.push(el("div", { class: "badge-month", text: monthData.month + "月累計 ¥" + monthData.total.toLocaleString() }));
+      children.push(el("div", { class: "badge-month", text: monthData.month + "月度(15日締め)累計 ¥" + monthData.total.toLocaleString() }));
     }
     if (state.showCost && monthData.dispatchFee > 0) {
-      children.push(el("div", { class: "badge-dispatch", text: monthData.month + "月 派遣手数料 ¥" + monthData.dispatchFee.toLocaleString() }));
+      children.push(el("div", { class: "badge-dispatch", text: monthData.month + "月度(15日締め) 派遣手数料 ¥" + monthData.dispatchFee.toLocaleString() }));
     }
     return el("div", { class: "week-nav-row" }, children);
   }
